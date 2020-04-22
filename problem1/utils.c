@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "common.h"
 
@@ -24,4 +25,11 @@ void print_packet (PACKET pkt, char *append) {
 		printf("\n%s PKT: Seq. no. %d of size %d bytes from channel %d\n", append, pkt.seqno, pkt.size, pkt.channel_id);
 	}
 	/*printf("msg: %s\n", pkt.payload);*/
+}
+
+bool should_drop () {
+	double threshold = ((double)PDR)/100;
+	double norm_rand = ((double)rand())/RAND_MAX;
+
+	return norm_rand < threshold;
 }

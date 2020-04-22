@@ -8,6 +8,8 @@
 #define PACKET_SIZE					100
 #define INPUT_FILE					"input.txt"
 #define OUTPUT_FILE					"output.txt"
+#define PDR							50 // packet drop rate (in percentage)
+#define PKT_TIMEOUT					2 // retransmission time (in seconds)
 
 typedef struct _PACKET_ {
 	int size;
@@ -22,5 +24,6 @@ typedef struct _PACKET_ {
 
 PACKET create_new_packet (int size, int seqno, bool is_last, bool is_ack, int cid, char *payload);
 void print_packet (PACKET pkt, char *append);
+bool should_drop ();
 
 #endif

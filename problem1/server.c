@@ -5,10 +5,13 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <poll.h>
+#include <time.h>
 
 #include "common.h"
 
 int main () {
+	srand(time(0)); // initialize random num generation
+
 	int listenfd; // listening socket
 	int c0_connfd, c1_connfd; // channel 0, 1 connection sockets
 	struct sockaddr_in serv_addr;
@@ -52,54 +55,96 @@ int main () {
 		return 1;
 	}
 
+	// output file
 	FILE *fp = fopen(OUTPUT_FILE, "w");
 
+	// pollfd struct channel 0
 	struct pollfd c0_pollfd = (struct pollfd) {
 		.fd = c0_connfd,
 		.events = POLLIN
 	};
 
+	// pollfd struct channel 1
 	struct pollfd c1_pollfd = (struct pollfd) {
 		.fd = c1_connfd,
 		.events = POLLIN
 	};
 
-	while (1) {
+	bool c0_closed = false, c1_closed = false;
+	while (!c0_closed || !c1_closed) {
 		struct pollfd c_pollfds[2] = {c0_pollfd, c1_pollfd};
 
 		int nready = poll(c_pollfds, 2, -1);
-		if (nready <= 0) continue;
+		if (nready <= 0) continue; // unexpected return of poll
 
 		if (c_pollfds[0].revents == POLLIN) {
+			// channel 0 fd became readable
+
 			PACKET rcv;
 			int n = read(c0_connfd, &rcv, MAX_PACKET_SIZE+1);
-			if (n == 0) break;
-			print_packet(rcv, "RCVD");
+			if (n != 0) { 
+				// socket not closed unexpectedly
 
-			fseek(fp, rcv.seqno, SEEK_SET);
-			fwrite(rcv.payload, 1, rcv.size, fp);
+				if (!should_drop()) {
+					// packet not dropped
 
-			PACKET pkt = create_new_packet(4, rcv.seqno, rcv.is_last, true, rcv.channel_id, "ACK");
-			write(c0_connfd, &pkt, MAX_PACKET_SIZE);
-			print_packet(pkt, "SENT");
+					print_packet(rcv, "RCVD");
 
-			if (rcv.is_last) break;
+					// write packet's data to file
+					// at appropriate offset
+					fseek(fp, rcv.seqno, SEEK_SET);
+					fwrite(rcv.payload, 1, rcv.size, fp);
+
+					// send ACK
+					PACKET pkt = create_new_packet(4, rcv.seqno, rcv.is_last, true, rcv.channel_id, "ACK");
+					write(c0_connfd, &pkt, MAX_PACKET_SIZE);
+					print_packet(pkt, "SENT");
+
+				}
+				/*
+				 *else {
+				 *    printf("Channel 0 packet dropped\n");
+				 *}
+				 */
+			}
+			else {
+				c0_closed = true;
+			}
 		}
 
 		if (c_pollfds[1].revents == POLLIN) {
+			// channel 1 fd became readable
+
 			PACKET rcv;
 			int n = read(c1_connfd, &rcv, MAX_PACKET_SIZE+1);
-			if (n == 0) break;
-			print_packet(rcv, "RCVD");
+			if (n != 0) {
+				// socket not closed unexpectedly
 
-			fseek(fp, rcv.seqno, SEEK_SET);
-			fwrite(rcv.payload, 1, rcv.size, fp);
+				if (!should_drop()) {
+					// packet not dropped
 
-			PACKET pkt = create_new_packet(4, rcv.seqno, rcv.is_last, true, rcv.channel_id, "ACK");
-			write(c1_connfd, &pkt, MAX_PACKET_SIZE);
-			print_packet(pkt, "SENT");
+					print_packet(rcv, "RCVD");
 
-			if (rcv.is_last) break;
+					// write packet's data to file
+					// at appropriate offset
+					fseek(fp, rcv.seqno, SEEK_SET);
+					fwrite(rcv.payload, 1, rcv.size, fp);
+
+					// send ACK
+					PACKET pkt = create_new_packet(4, rcv.seqno, rcv.is_last, true, rcv.channel_id, "ACK");
+					write(c1_connfd, &pkt, MAX_PACKET_SIZE);
+					print_packet(pkt, "SENT");
+
+				}
+				/*
+				 *else {
+				 *    printf("Channel 1 packet dropped\n");
+				 *}
+				 */
+			} 
+			else {
+				c1_closed = true;
+			}
 		}
 	}
 
