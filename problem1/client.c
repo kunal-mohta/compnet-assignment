@@ -60,7 +60,7 @@ int main () {
 	write(c0_sockfd, &c0_pkt, MAX_PACKET_SIZE+1);
 	print_packet(c0_pkt, "SENT");
 
-	if (nread != PACKET_SIZE) return 0; // first packet was the last packet
+	/*if (nread != PACKET_SIZE) return 0; // first packet was the last packet*/
 
 	// start timer for channel 0 pkt
 	clock_t c0_start_time = clock();
@@ -77,7 +77,7 @@ int main () {
 	write(c1_sockfd, &c1_pkt, MAX_PACKET_SIZE+1);
 	print_packet(c1_pkt, "SENT");
 
-	if (nread != PACKET_SIZE) return 0; // first packet was the last packet
+	/*if (nread != PACKET_SIZE) return 0; // first packet was the last packet*/
 
 	// start timer for channel 1 pkt
 	clock_t c1_start_time = clock();
