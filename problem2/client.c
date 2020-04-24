@@ -9,19 +9,13 @@
 
 #include "common.h"
 
-enum State {
-	unsent,
-	unack,
-	ack
-};
-
-void send_packet_to_relay (PACKET pkt, int relay1_fd, int relay2_fd) {
+void send_packet_to_relay (PACKET pkt, int relay1_fd, int relay2_fd, struct sockaddr_in relay1_addr, struct sockaddr_in relay2_addr) {
 	if (pkt.seqno % 2 == 0) {
-		write(relay1_fd, &pkt, MAX_PACKET_SIZE);
+		sendto(relay1_fd, &pkt, MAX_PACKET_SIZE, 0, (struct sockaddr *) &relay1_addr, sizeof(relay1_addr));
 		print_packet(pkt, "SENT to relay 1");
 	}
 	else {
-		write(relay2_fd, &pkt, MAX_PACKET_SIZE);
+		sendto(relay2_fd, &pkt, MAX_PACKET_SIZE, 0, (struct sockaddr *) &relay2_addr, sizeof(relay2_addr));
 		print_packet(pkt, "SENT to relay 2");
 	}
 }
@@ -45,14 +39,14 @@ int main () {
 	struct sockaddr_in relay1_addr, relay2_addr;
 
 	// Socket creation for relay 1 
-	relay1_fd = socket(AF_INET, SOCK_STREAM, 0);
+	relay1_fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (relay1_fd < 0) {
 		perror("ERROR in relay 1 socket creation");
 		return 1;
 	}
 
 	// Socket creation for relay 2
-	relay2_fd = socket(AF_INET, SOCK_STREAM, 0);
+	relay2_fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (relay2_fd < 0) {
 		perror("ERROR in relay 2 socket creation");
 		return 1;
@@ -70,26 +64,12 @@ int main () {
 	relay2_addr.sin_port = htons(ODD_RELAY_PORT);
 	relay2_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
+	// Inform relays about client addr
+	sendto(relay1_fd, SYNC_MSG, SYNC_LEN*sizeof(char), 0, (struct sockaddr *) &relay1_addr, sizeof(relay1_addr));
+	sendto(relay2_fd, SYNC_MSG, SYNC_LEN*sizeof(char), 0, (struct sockaddr *) &relay2_addr, sizeof(relay2_addr));
 
-	// Establish connection relay 1 
-	if (connect(relay1_fd, (struct sockaddr *) &relay1_addr, sizeof(relay1_addr)) < 0) {
-		perror("Error in relay 1 connect()");
-		return 1;
-	}
-
-	// Establish connection channel 1
-	if (connect(relay2_fd, (struct sockaddr *) &relay2_addr, sizeof(relay2_addr)) < 0) {
-		perror("Error in relay 2 connect()");
-		return 1;
-	}
 
 	FILE *fp = fopen(INPUT_FILE, "r");
-
-	// making both sockets non-blocking
-	int flags = fcntl(relay1_fd, F_GETFL, 0);
-	fcntl(relay1_fd, F_SETFL, flags | O_NONBLOCK);
-	flags = fcntl(relay2_fd, F_GETFL, 0);
-	fcntl(relay2_fd, F_SETFL, flags | O_NONBLOCK);
 
 	bool r1_stop = false, r2_stop = false, file_end = false;
 	while (!r1_stop || !r2_stop) {
@@ -109,7 +89,7 @@ int main () {
 
 			PACKET pkt = create_new_packet(strlen(msg)*sizeof(char), curr_seqno, nread != PACKET_SIZE, false, 0, msg); // if nread != PACKET_SIZE, then packet is last
 
-			send_packet_to_relay(pkt, relay1_fd, relay2_fd);
+			send_packet_to_relay(pkt, relay1_fd, relay2_fd, relay1_addr, relay2_addr);
 
 			pkt_buf[curr_seqno % WINDOW_SIZE] = pkt;
 			pkt_status[curr_seqno % WINDOW_SIZE] = unack;
@@ -132,7 +112,7 @@ int main () {
 				if (diff > PKT_TIMEOUT) {
 					// retransmission
 					
-					send_packet_to_relay(pkt_buf[i], relay1_fd, relay2_fd);
+					send_packet_to_relay(pkt_buf[i], relay1_fd, relay2_fd, relay1_addr, relay2_addr);
 
 					// reset timer
 					timers[i] = clock();
@@ -148,14 +128,16 @@ int main () {
 		}
 
 		PACKET rcv;
-		int nread;
+		int nread, slen;
 		/*if (!r1_stop) {*/
 			// try reading from relay 1 
 			// only if eof not seen yet
 
-			memset(&rcv, '0', sizeof(rcv));
-			nread = read(relay1_fd, &rcv, MAX_PACKET_SIZE);
-			if (nread != -1) {
+			memset(&rcv, 0, sizeof(rcv));
+			slen = sizeof(relay1_addr);
+			nread = recvfrom(relay1_fd, &rcv, MAX_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr *) &relay1_addr, &slen);
+			if (nread == 0) r1_stop = true;
+			else if (nread != -1) {
 				print_packet(rcv, "RCVD from relay 1");
 
 				if (rcv.seqno >= window_start) {
@@ -183,8 +165,10 @@ int main () {
 			// only if eof not seen yet
 
 			memset(&rcv, '0', sizeof(rcv));
-			nread = read(relay2_fd, &rcv, MAX_PACKET_SIZE);
-			if (nread != -1) {
+			slen = sizeof(relay2_addr);
+			nread = recvfrom(relay2_fd, &rcv, MAX_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr *) &relay2_addr, &slen);
+			if (nread == 0) r2_stop = true;
+			else if (nread != -1) {
 				print_packet(rcv, "RCVD from relay 2");
 
 				if (rcv.seqno >= window_start) {
@@ -205,6 +189,14 @@ int main () {
 			}
 		/*}*/
 		
+	}
+
+	// to inform r1, r2 to stop
+	if (!r1_stop) {
+		sendto(relay1_fd, "", 0, 0, (struct sockaddr *) &relay1_addr, sizeof(relay1_addr));
+	}
+	if (!r2_stop) {
+		sendto(relay2_fd, "", 0, 0, (struct sockaddr *) &relay2_addr, sizeof(relay2_addr));
 	}
 
 	fclose(fp);

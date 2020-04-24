@@ -13,8 +13,16 @@
 #define PDR							50 // packet drop rate (in percentage)
 #define PKT_TIMEOUT					2 // retransmission time (in seconds)
 #define WINDOW_SIZE					5
-#define DELAY_MIN					1500 // retransmission time (in milliseconds)
-#define DELAY_MAX					2000 // retransmission time (in milliseconds)
+#define DELAY_MIN					0 // retransmission time (in milliseconds)
+#define DELAY_MAX					2 // retransmission time (in milliseconds)
+#define SYNC_MSG					"sync"
+#define SYNC_LEN					strlen(SYNC_MSG)
+
+enum State {
+	unsent,
+	unack,
+	ack
+};
 
 typedef struct _PACKET_ {
 	int size;

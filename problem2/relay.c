@@ -23,11 +23,12 @@ int main (int argc, char *argv[]) {
 
 	int server_fd; // server socket
 	struct sockaddr_in serv_addr;
+	int saddr_size = sizeof(serv_addr);
 
-	// Socket creation for channel 0
-	server_fd = socket(AF_INET, SOCK_STREAM, 0);
+	// Socket creation for communication with server
+	server_fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (server_fd < 0) {
-		perror("ERROR in relay client socket creation (for connection with server)");
+		perror("ERROR in relay-server socket creation");
 		return 1;
 	}
 
@@ -37,23 +38,18 @@ int main (int argc, char *argv[]) {
 	serv_addr.sin_port = htons(SERVER_PORT);
 	serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
-	// Establish connection main server 
-	if (connect(server_fd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-		perror("Error in relay connect() with server");
-		return 1;
-	}
+	// Inform server about relay addr
+	sendto(server_fd, SYNC_MSG, SYNC_LEN*sizeof(char), 0, (struct sockaddr *) &serv_addr, saddr_size);
 
 
 	/** RELAY AS "SERVER" FOR CLIENT **/
-
-	int listenfd; // listening socket
-	int client_fd; // connection socket
+	int client_fd; // client socket
 	struct sockaddr_in relay_serv_addr;
 
-	// listening socket
-	listenfd = socket(AF_INET, SOCK_STREAM, 0);
-	if (listenfd < 0) {
-		perror("ERROR in relay server listening socket creation");
+	// Socket creation for communication with client 
+	client_fd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (client_fd < 0) {
+		perror("ERROR in relay-client socket creation");
 		return 1;
 	}
 
@@ -64,82 +60,68 @@ int main (int argc, char *argv[]) {
 	relay_serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
 	// bindi listening socket and server addr
-	if (bind(listenfd, (struct sockaddr *) &relay_serv_addr, sizeof(relay_serv_addr)) < 0) {
+	if (bind(client_fd, (struct sockaddr *) &relay_serv_addr, sizeof(relay_serv_addr)) < 0) {
 		perror("Error in binding server address");
 		return 1;
 	}
 
-	// start listening for connections
-	if (listen(listenfd, MAX_LISTEN_QUEUE) < 0) {
-		perror("Error in starting to listen for connections");
+	// get client addr
+	struct sockaddr_in client_addr;
+	int caddr_size = sizeof(client_addr);
+	char client_sync[SYNC_LEN];
+	if (recvfrom(client_fd, client_sync, SYNC_LEN*sizeof(char), 0, (struct sockaddr *) &client_addr, &caddr_size) == -1) {
+		perror("Error in syncing with client");
 		return 1;
 	}
-
-	// Accept client connection
-	client_fd = accept(listenfd, (struct sockaddr *) NULL, NULL);
-	if (client_fd < 0) {
-		perror("Error in accepting client connection");
-		return 1;
-	}
-
 
 	/** NEED TO LISTEN FOR MSGS FROM BOTH SERVER & CLIENT **/
-
-	// pollfd struct channel 0
-	struct pollfd client_pollfd = (struct pollfd) {
-		.fd = client_fd,
-		.events = POLLIN
-	};
-
-	// pollfd struct channel 1
-	struct pollfd server_pollfd = (struct pollfd) {
-		.fd = server_fd,
-		.events = POLLIN
-	};
 
 	bool client_closed = false, server_closed = false;
 	// exit when either one of client or server socket is closed
 	while (!client_closed && !server_closed) {
-		struct pollfd c_pollfds[2] = {client_pollfd, server_pollfd};
 
-		int nready = poll(c_pollfds, 2, -1);
-		if (nready <= 0) continue; // unexpected return of poll
+		PACKET rcv;
+		int ret;
 
-		if (c_pollfds[0].revents == POLLIN) {
-			// client fd became readable
+		memset(&rcv, 0, sizeof(rcv));
+		caddr_size = sizeof(client_addr);
+		ret = recvfrom(client_fd, &rcv, MAX_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr *) &client_addr, &caddr_size);
+		if (ret != -1) {
+			// msg received from client
 
-			PACKET rcv;
-			int n = read(client_fd, &rcv, MAX_PACKET_SIZE);
-			if (n != 0) { 
+			if (ret != 0) { 
 				// socket not closed
 
-				if (!should_drop()) {
+				/*if (!should_drop()) {*/
 					// packet not dropped
 
 					print_packet(rcv, "RCVD from client");
 
-					mdelay(rand_range(DELAY_MIN, DELAY_MAX));
+					/*mdelay(rand_range(DELAY_MIN, DELAY_MAX));*/
 
 					PACKET pkt = create_new_packet(rcv.size, rcv.seqno, rcv.is_last, rcv.is_ack, rcv.channel_id, rcv.payload);
-					write(server_fd, &pkt, MAX_PACKET_SIZE);
+					sendto(server_fd, &pkt, MAX_PACKET_SIZE, 0, (struct sockaddr *) &serv_addr, saddr_size);
 					print_packet(pkt, "SENT to server");
-				}
-				else {
-					printf("client packet dropped\n");
-				}
+				/*
+				 *}
+				 *else {
+				 *    printf("client packet dropped\n");
+				 *}
+				 */
 			}
 			else {
 				client_closed = true;
 			}
 		}
 
-		if (c_pollfds[1].revents == POLLIN) {
-			// server fd became readable
+		memset(&rcv, 0, sizeof(rcv));
+		saddr_size = sizeof(serv_addr);
+		ret = recvfrom(server_fd, &rcv, MAX_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr *) &serv_addr, &saddr_size);
+		if (ret != -1) {
+			// msg received from server 
 
-			PACKET rcv;
-			int n = read(server_fd, &rcv, MAX_PACKET_SIZE);
-			if (n != 0) {
-				// socket not closed unexpectedly
+			if (ret != 0) {
+				// socket not closed 
 
 				// packets from server are not dropped
 				print_packet(rcv, "RCVD from server");
@@ -147,7 +129,7 @@ int main (int argc, char *argv[]) {
 				mdelay(rand_range(DELAY_MIN, DELAY_MAX));
 
 				PACKET pkt = create_new_packet(rcv.size, rcv.seqno, rcv.is_last, rcv.is_ack, rcv.channel_id, rcv.payload);
-				write(client_fd, &pkt, MAX_PACKET_SIZE);
+				sendto(client_fd, &pkt, MAX_PACKET_SIZE, 0, (struct sockaddr *) &client_addr, caddr_size);
 				print_packet(pkt, "SENT to client");
 			} 
 			else {
@@ -155,9 +137,15 @@ int main (int argc, char *argv[]) {
 			}
 		}
 	}
+	// to inform server, client to stop
+	if (!server_closed) {
+		sendto(server_fd, "", 0, 0, (struct sockaddr *) &serv_addr, sizeof(serv_addr));
+	}
+	if (!client_closed) {
+		sendto(client_fd, "", 0, 0, (struct sockaddr *) &client_addr, sizeof(client_addr));
+	}
 
 	close(client_fd);
 	close(server_fd);
-	close(listenfd);
 	return 0;
 }
