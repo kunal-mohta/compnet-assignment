@@ -10,10 +10,8 @@
 #include "common.h"
 
 int main () {
-	srand(time(0)); // initialize random num generation
-
 	int listenfd; // listening socket
-	int c0_connfd, c1_connfd; // channel 0, 1 connection sockets
+	int r1_connfd, r2_connfd; // relay 1,2 connection sockets
 	struct sockaddr_in serv_addr;
 
 	// listening socket
@@ -29,7 +27,7 @@ int main () {
 	serv_addr.sin_port = htons(SERVER_PORT);
 	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-	// bindi listening socket and server addr
+	// bind listening socket and server addr
 	if (bind(listenfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
 		perror("Error in binding server address");
 		return 1;
@@ -41,17 +39,17 @@ int main () {
 		return 1;
 	}
 
-	// Accept channel 0
-	c0_connfd = accept(listenfd, (struct sockaddr *) NULL, NULL);
-	if (c0_connfd < 0) {
-		perror("Error in accepting channel 0 connection");
+	// Accept relay 1 
+	r1_connfd = accept(listenfd, (struct sockaddr *) NULL, NULL);
+	if (r1_connfd < 0) {
+		perror("Error in accepting relay 1 connection");
 		return 1;
 	}
 
-	// Accept channel 1
-	c1_connfd = accept(listenfd, (struct sockaddr *) NULL, NULL);
-	if (c1_connfd < 0) {
-		perror("Error in accepting channel 1 connection");
+	// Accept relay 2 
+	r2_connfd = accept(listenfd, (struct sockaddr *) NULL, NULL);
+	if (r2_connfd < 0) {
+		perror("Error in accepting relay 2 connection");
 		return 1;
 	}
 
@@ -59,33 +57,33 @@ int main () {
 	FILE *fp = fopen(OUTPUT_FILE, "w");
 
 	// pollfd struct channel 0
-	struct pollfd c0_pollfd = (struct pollfd) {
-		.fd = c0_connfd,
+	struct pollfd r1_pollfd = (struct pollfd) {
+		.fd = r1_connfd,
 		.events = POLLIN
 	};
 
 	// pollfd struct channel 1
-	struct pollfd c1_pollfd = (struct pollfd) {
-		.fd = c1_connfd,
+	struct pollfd r2_pollfd = (struct pollfd) {
+		.fd = r2_connfd,
 		.events = POLLIN
 	};
 
-	bool c0_closed = false, c1_closed = true;
-	while (!c0_closed || !c1_closed) {
-		struct pollfd c_pollfds[2] = {c0_pollfd, c1_pollfd};
+	bool r1_closed = false, r2_closed = true;
+	while (!r1_closed || !r2_closed) {
+		struct pollfd r_pollfds[2] = {r1_pollfd, r2_pollfd};
 
-		int nready = poll(c_pollfds, 2, -1);
+		int nready = poll(r_pollfds, 2, -1);
 		if (nready <= 0) continue; // unexpected return of poll
 
-		if (c_pollfds[0].revents == POLLIN) {
+		if (r_pollfds[0].revents == POLLIN) {
 			// channel 0 fd became readable
 
 			PACKET rcv;
-			int n = read(c0_connfd, &rcv, MAX_PACKET_SIZE+1);
+			int n = read(r1_connfd, &rcv, MAX_PACKET_SIZE);
 			if (n != 0) { 
 				// socket not closed unexpectedly
 
-				print_packet(rcv, "RCVD");
+				print_packet(rcv, "RCVD from relay 1");
 
 				// write packet's data to file
 				// at appropriate offset
@@ -96,23 +94,23 @@ int main () {
 
 				// send ACK
 				PACKET pkt = create_new_packet(4, rcv.seqno, rcv.is_last, true, rcv.channel_id, "ACK");
-				write(c0_connfd, &pkt, MAX_PACKET_SIZE);
-				print_packet(pkt, "SENT");
+				write(r1_connfd, &pkt, MAX_PACKET_SIZE);
+				print_packet(pkt, "SENT to relay 1");
 			}
 			else {
-				c0_closed = true;
+				r1_closed = true;
 			}
 		}
 
-		if (c_pollfds[1].revents == POLLIN) {
+		if (r_pollfds[1].revents == POLLIN) {
 			// channel 1 fd became readable
 
 			PACKET rcv;
-			int n = read(c1_connfd, &rcv, MAX_PACKET_SIZE+1);
+			int n = read(r2_connfd, &rcv, MAX_PACKET_SIZE);
 			if (n != 0) {
 				// socket not closed unexpectedly
 
-				print_packet(rcv, "RCVD");
+				print_packet(rcv, "RCVD from relay 2");
 
 				// write packet's data to file
 				// at appropriate offset
@@ -121,17 +119,17 @@ int main () {
 
 				// send ACK
 				PACKET pkt = create_new_packet(4, rcv.seqno, rcv.is_last, true, rcv.channel_id, "ACK");
-				write(c1_connfd, &pkt, MAX_PACKET_SIZE);
-				print_packet(pkt, "SENT");
+				write(r2_connfd, &pkt, MAX_PACKET_SIZE);
+				print_packet(pkt, "SENT to relay 2");
 			} 
 			else {
-				c1_closed = true;
+				r2_closed = true;
 			}
 		}
 	}
 
 	fclose(fp);
-	close(c0_connfd);
-	close(c1_connfd);
+	close(r1_connfd);
+	close(r2_connfd);
 	close(listenfd);
 }

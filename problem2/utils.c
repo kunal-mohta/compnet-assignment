@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include "common.h"
 
@@ -13,7 +14,8 @@ PACKET create_new_packet (int size, int seqno, bool is_last, bool is_ack, int ci
 		.is_ack = is_ack,
 		.channel_id = cid
 	};
-	strcpy(pkt.payload, payload);
+	memset(pkt.payload, 0, PACKET_SIZE);
+	memcpy(pkt.payload, payload, PACKET_SIZE);
 	return pkt;
 }
 
@@ -32,4 +34,20 @@ bool should_drop () {
 	double norm_rand = ((double)rand())/RAND_MAX;
 
 	return norm_rand < threshold;
+}
+
+double rand_range (double min, double max) {
+	double scaled_rand = (((double)rand())/RAND_MAX)*(max-min);
+	return min + scaled_rand;
+}
+
+void mdelay (double time_ms) {
+	struct timespec delay_time;
+	delay_time.tv_sec = time_ms/1000;
+	delay_time.tv_nsec = (time_ms - (delay_time.tv_sec*1000)) * 1000000;
+	/*printf("here %lf, sec %ld, nsec %ld\n", time_ms, delay_time.tv_sec, delay_time.tv_nsec);*/
+	int x = nanosleep(&delay_time, &delay_time);
+	if (x == -1) {
+		perror("nanosleep");
+	}
 }

@@ -109,24 +109,24 @@ int main (int argc, char *argv[]) {
 			// client fd became readable
 
 			PACKET rcv;
-			int n = read(client_fd, &rcv, MAX_PACKET_SIZE+1);
+			int n = read(client_fd, &rcv, MAX_PACKET_SIZE);
 			if (n != 0) { 
 				// socket not closed
 
-				/*if (!should_drop()) {*/
+				if (!should_drop()) {
 					// packet not dropped
 
-					print_packet(rcv, "RCVD");
+					print_packet(rcv, "RCVD from client");
+
+					mdelay(rand_range(DELAY_MIN, DELAY_MAX));
 
 					PACKET pkt = create_new_packet(rcv.size, rcv.seqno, rcv.is_last, rcv.is_ack, rcv.channel_id, rcv.payload);
 					write(server_fd, &pkt, MAX_PACKET_SIZE);
-					print_packet(pkt, "SENT");
-				/*}*/
-				/*
-				 *else {
-				 *    printf("Channel 0 packet dropped\n");
-				 *}
-				 */
+					print_packet(pkt, "SENT to server");
+				}
+				else {
+					printf("client packet dropped\n");
+				}
 			}
 			else {
 				client_closed = true;
@@ -137,20 +137,18 @@ int main (int argc, char *argv[]) {
 			// server fd became readable
 
 			PACKET rcv;
-			int n = read(server_fd, &rcv, MAX_PACKET_SIZE+1);
+			int n = read(server_fd, &rcv, MAX_PACKET_SIZE);
 			if (n != 0) {
 				// socket not closed unexpectedly
 
 				// packets from server are not dropped
-				print_packet(rcv, "RCVD");
+				print_packet(rcv, "RCVD from server");
 
-				/*
-				 *write(client_fd, &rcv, MAX_PACKET_SIZE);
-				 *print_packet(rcv, "SENT");
-				 */
+				mdelay(rand_range(DELAY_MIN, DELAY_MAX));
+
 				PACKET pkt = create_new_packet(rcv.size, rcv.seqno, rcv.is_last, rcv.is_ack, rcv.channel_id, rcv.payload);
 				write(client_fd, &pkt, MAX_PACKET_SIZE);
-				print_packet(pkt, "SENT");
+				print_packet(pkt, "SENT to client");
 			} 
 			else {
 				server_closed = true;
