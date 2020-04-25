@@ -9,8 +9,37 @@
 
 #include "common.h"
 
+bool insert_in_buf (PACKET pkt_buf[], enum State pkt_status[], PACKET pkt) {
+	for (int i = 0; i < BUF_SIZE; i++) {
+		if (pkt_status[i] == invalid) {
+			pkt_buf[i] = pkt;
+			pkt_status[i] = valid;
+			return true;
+		}
+	}
+	return false;
+}
+
+int find_in_buf (PACKET pkt_buf[], enum State pkt_status[], int seqno) {
+	for (int i = 0; i < BUF_SIZE; i++) {
+		if (pkt_status[i] == valid && pkt_buf[i].seqno == seqno) {
+			return i;
+		}
+	}
+	return -1;
+}
+
 int main () {
 	srand(time(0)); // initialize random num generation
+
+	// Buffer related initialization
+	PACKET pkt_buf[BUF_SIZE];
+	enum State pkt_status[BUF_SIZE];
+	for (int i = 0; i < BUF_SIZE; i++)
+		pkt_status[i] = invalid;
+	int buf_start = 0, buf_end = BUF_SIZE-1;
+	int expected_seqno = 0;
+
 
 	int listenfd; // listening socket
 	int c0_connfd, c1_connfd; // channel 0, 1 connection sockets
@@ -90,22 +119,34 @@ int main () {
 
 					print_packet(rcv, "RCVD");
 
-					// write packet's data to file
-					// at appropriate offset
-					fseek(fp, rcv.seqno, SEEK_SET);
-					fwrite(rcv.payload, 1, rcv.size, fp);
+					bool send_ack = true;
+					if (rcv.seqno == expected_seqno) {
+						// write packet's data to file
+						fwrite(rcv.payload, 1, rcv.size, fp);
+						expected_seqno += rcv.size;
 
-					// send ACK
-					PACKET pkt = create_new_packet(4, rcv.seqno, rcv.is_last, true, rcv.channel_id, "ACK");
-					write(c0_connfd, &pkt, MAX_PACKET_SIZE);
-					print_packet(pkt, "SENT");
+						// write as many packets as possible from buffer
+						int pind;
+						while ((pind = find_in_buf(pkt_buf, pkt_status, expected_seqno)) != -1) {
+							PACKET p = pkt_buf[pind];
+							fwrite(p.payload, 1, p.size, fp); // write to file
+							expected_seqno += p.size; // next expected seqno
+							pkt_status[pind] = invalid; // delete from buffer
+						}
+					}
+					else if (!insert_in_buf(pkt_buf, pkt_status, rcv)) {
+						// buffer full
+						printf("Buffer is full... packet at seqno %d dropped\n", rcv.seqno);
+						send_ack = false;
+					}
 
+					if (send_ack) {
+						// send ACK
+						PACKET pkt = create_new_packet(4, rcv.seqno, rcv.is_last, true, rcv.channel_id, "ACK");
+						write(c0_connfd, &pkt, MAX_PACKET_SIZE);
+						print_packet(pkt, "SENT");
+					}
 				}
-				/*
-				 *else {
-				 *    printf("Channel 0 packet dropped\n");
-				 *}
-				 */
 			}
 			else {
 				c0_closed = true;
@@ -125,22 +166,34 @@ int main () {
 
 					print_packet(rcv, "RCVD");
 
-					// write packet's data to file
-					// at appropriate offset
-					fseek(fp, rcv.seqno, SEEK_SET);
-					fwrite(rcv.payload, 1, rcv.size, fp);
+					bool send_ack = true;
+					if (rcv.seqno == expected_seqno) {
+						// write packet's data to file
+						fwrite(rcv.payload, 1, rcv.size, fp);
+						expected_seqno += rcv.size;
 
-					// send ACK
-					PACKET pkt = create_new_packet(4, rcv.seqno, rcv.is_last, true, rcv.channel_id, "ACK");
-					write(c1_connfd, &pkt, MAX_PACKET_SIZE);
-					print_packet(pkt, "SENT");
+						// write as many packets as possible from buffer
+						int pind;
+						while ((pind = find_in_buf(pkt_buf, pkt_status, expected_seqno)) != -1) {
+							PACKET p = pkt_buf[pind];
+							fwrite(p.payload, 1, p.size, fp); // write to file
+							expected_seqno += p.size; // next expected seqno
+							pkt_status[pind] = invalid; // delete from buffer
+						}
+					}
+					else if (!insert_in_buf(pkt_buf, pkt_status, rcv)) {
+						// buffer full
+						printf("Buffer is full... packet at seqno %d dropped\n", rcv.seqno);
+						send_ack = false;
+					}
 
+					if (send_ack) {
+						// send ACK
+						PACKET pkt = create_new_packet(4, rcv.seqno, rcv.is_last, true, rcv.channel_id, "ACK");
+						write(c1_connfd, &pkt, MAX_PACKET_SIZE);
+						print_packet(pkt, "SENT");
+					}
 				}
-				/*
-				 *else {
-				 *    printf("Channel 1 packet dropped\n");
-				 *}
-				 */
 			} 
 			else {
 				c1_closed = true;

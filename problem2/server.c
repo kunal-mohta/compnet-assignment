@@ -10,12 +10,14 @@
 #include "common.h"
 
 int main () {
+	// Packet window buffer related initialization
 	PACKET pkt_buf[WINDOW_SIZE];
 	enum State pkt_status[WINDOW_SIZE];
 	for (int i = 0; i < WINDOW_SIZE; i++) {
 		pkt_status[i] = unack;
 	}
 	int window_start = 0, window_end = WINDOW_SIZE-1;
+
 
 	int serv_fd;
 	int r1_fd, r2_fd; // relay 1,2 connection sockets

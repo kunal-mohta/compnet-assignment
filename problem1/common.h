@@ -10,6 +10,12 @@
 #define OUTPUT_FILE					"output.txt"
 #define PDR							50 // packet drop rate (in percentage)
 #define PKT_TIMEOUT					2 // retransmission time (in seconds)
+#define BUF_SIZE					5 // in terms of packets that can fit
+
+enum State {
+	valid,
+	invalid
+};
 
 typedef struct _PACKET_ {
 	int size;
@@ -20,7 +26,7 @@ typedef struct _PACKET_ {
 	char payload[PACKET_SIZE];
 } PACKET;
 
-#define MAX_PACKET_SIZE				sizeof(PACKET) + (PACKET_SIZE*sizeof(char))
+#define MAX_PACKET_SIZE				sizeof(PACKET)
 
 PACKET create_new_packet (int size, int seqno, bool is_last, bool is_ack, int cid, char *payload);
 void print_packet (PACKET pkt, char *append);

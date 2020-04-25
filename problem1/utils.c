@@ -13,7 +13,8 @@ PACKET create_new_packet (int size, int seqno, bool is_last, bool is_ack, int ci
 		.is_ack = is_ack,
 		.channel_id = cid
 	};
-	strcpy(pkt.payload, payload);
+	memset(pkt.payload, 0, PACKET_SIZE);
+	memcpy(pkt.payload, payload, PACKET_SIZE);
 	return pkt;
 }
 

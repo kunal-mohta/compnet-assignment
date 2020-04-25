@@ -48,39 +48,53 @@ int main () {
 
 	FILE *fp = fopen(INPUT_FILE, "r");
 
+	bool c0_stop = false, c1_stop = false;
 
 	// First packet send, on channel 0
 	char c0_msg[PACKET_SIZE+1];
-	int nread = fread(c0_msg, 1, PACKET_SIZE, fp);
-	c0_msg[nread] = 0;
+	PACKET c0_pkt;
+	int nread;
+	clock_t c0_start_time;
 
-	PACKET c0_pkt = create_new_packet(strlen(c0_msg)*sizeof(char), bytes_sent, nread != PACKET_SIZE, false, 0, c0_msg); // if nread != PACKET_SIZE, then packet is last
-	bytes_sent += nread;
+	if (feof(fp) != 0) {
+		c0_stop = true;
+	}
+	else {
+		nread = fread(c0_msg, 1, PACKET_SIZE, fp);
+		c0_msg[nread] = 0;
 
-	write(c0_sockfd, &c0_pkt, MAX_PACKET_SIZE+1);
-	print_packet(c0_pkt, "SENT");
+		c0_pkt = create_new_packet(strlen(c0_msg)*sizeof(char), bytes_sent, nread != PACKET_SIZE, false, 0, c0_msg); // if nread != PACKET_SIZE, then packet is last
+		bytes_sent += nread;
 
-	/*if (nread != PACKET_SIZE) return 0; // first packet was the last packet*/
+		write(c0_sockfd, &c0_pkt, MAX_PACKET_SIZE);
+		print_packet(c0_pkt, "SENT");
 
-	// start timer for channel 0 pkt
-	clock_t c0_start_time = clock();
+		// start timer for channel 0 pkt
+		c0_start_time = clock();
+	}
 
 
 	// Second packet send, on channel 1
 	char c1_msg[PACKET_SIZE+1];
-	nread = fread(c1_msg, 1, PACKET_SIZE, fp);
-	c1_msg[nread] = 0;
+	PACKET c1_pkt;
+	clock_t c1_start_time;
 
-	PACKET c1_pkt = create_new_packet(strlen(c1_msg)*sizeof(char), bytes_sent, nread != PACKET_SIZE, false, 1, c1_msg); // if nread != PACKET_SIZE, then packet is last
-	bytes_sent += nread;
+	if (feof(fp) != 0) {
+		c1_stop = true;
+	}
+	else {
+		nread = fread(c1_msg, 1, PACKET_SIZE, fp);
+		c1_msg[nread] = 0;
 
-	write(c1_sockfd, &c1_pkt, MAX_PACKET_SIZE+1);
-	print_packet(c1_pkt, "SENT");
+		c1_pkt = create_new_packet(strlen(c1_msg)*sizeof(char), bytes_sent, nread != PACKET_SIZE, false, 1, c1_msg); // if nread != PACKET_SIZE, then packet is last
+		bytes_sent += nread;
 
-	/*if (nread != PACKET_SIZE) return 0; // first packet was the last packet*/
+		write(c1_sockfd, &c1_pkt, MAX_PACKET_SIZE);
+		print_packet(c1_pkt, "SENT");
 
-	// start timer for channel 1 pkt
-	clock_t c1_start_time = clock();
+		// start timer for channel 1 pkt
+		c1_start_time = clock();
+	}
 
 
 	// making both sockets non-blocking
@@ -89,7 +103,7 @@ int main () {
 	flags = fcntl(c1_sockfd, F_GETFL, 0);
 	fcntl(c1_sockfd, F_SETFL, flags | O_NONBLOCK);
 
-	bool c0_stop = false, c1_stop = false;
+
 	while (!c0_stop || !c1_stop) {
 		PACKET rcv;
 
@@ -107,11 +121,12 @@ int main () {
 				if (diff > PKT_TIMEOUT) {
 					// retransmission
 					
-					write(c0_sockfd, &c0_pkt, MAX_PACKET_SIZE+1);
-					print_packet(c0_pkt, "SENT");
+					if (write(c0_sockfd, &c0_pkt, MAX_PACKET_SIZE) != -1) {
+						print_packet(c0_pkt, "SENT");
 
-					// reset channel 0 timer
-					c0_start_time = clock();
+						// reset channel 0 timer
+						c0_start_time = clock();
+					}
 				}
 			}
 			else {
@@ -131,11 +146,12 @@ int main () {
 					c0_pkt = create_new_packet(strlen(c0_msg)*sizeof(char), bytes_sent, nread != PACKET_SIZE, false, 0, c0_msg);
 					bytes_sent += nread;
 
-					write(c0_sockfd, &c0_pkt, MAX_PACKET_SIZE+1);
-					print_packet(c0_pkt, "SENT");
+					if (write(c0_sockfd, &c0_pkt, MAX_PACKET_SIZE) != -1) {
+						print_packet(c0_pkt, "SENT");
 
-					// reset channel 0 timer
-					c0_start_time = clock();
+						// reset channel 0 timer
+						c0_start_time = clock();
+					}
 				}
 			}
 		}
@@ -155,11 +171,12 @@ int main () {
 				if (diff > PKT_TIMEOUT) {
 					// retransmission
 					
-					write(c1_sockfd, &c1_pkt, MAX_PACKET_SIZE+1);
-					print_packet(c1_pkt, "SENT");
+					if (write(c1_sockfd, &c1_pkt, MAX_PACKET_SIZE) != -1) {
+						print_packet(c1_pkt, "SENT");
 
-					// reset channel 1 timer
-					c1_start_time = clock();
+						// reset channel 1 timer
+						c1_start_time = clock();
+					}
 				}
 			}
 			else {
@@ -179,11 +196,12 @@ int main () {
 					c1_pkt = create_new_packet(strlen(c1_msg)*sizeof(char), bytes_sent, nread != PACKET_SIZE, false, 1, c1_msg);
 					bytes_sent += nread;
 
-					write(c1_sockfd, &c1_pkt, MAX_PACKET_SIZE+1);
-					print_packet(c1_pkt, "SENT");
+					if (write(c1_sockfd, &c1_pkt, MAX_PACKET_SIZE)) {
+						print_packet(c1_pkt, "SENT");
 
-					// reset channel 1 timer
-					c1_start_time = clock();
+						// reset channel 1 timer
+						c1_start_time = clock();
+					}
 				}
 			}
 		}
