@@ -9,14 +9,14 @@
 
 #include "common.h"
 
-void send_packet_to_relay (PACKET pkt, int relay1_fd, int relay2_fd, struct sockaddr_in relay1_addr, struct sockaddr_in relay2_addr) {
+void send_packet_to_relay (PACKET pkt, int relay1_fd, int relay2_fd, struct sockaddr_in relay1_addr, struct sockaddr_in relay2_addr, bool retransmit) {
 	if (pkt.seqno % 2 == 0) {
 		sendto(relay1_fd, &pkt, MAX_PACKET_SIZE, 0, (struct sockaddr *) &relay1_addr, sizeof(relay1_addr));
-		print_packet(pkt, "SENT to relay 1");
+		print_packet(pkt, "CLIENT", (retransmit) ? "RE" : "S", "CLIENT", "RELAY1");
 	}
 	else {
 		sendto(relay2_fd, &pkt, MAX_PACKET_SIZE, 0, (struct sockaddr *) &relay2_addr, sizeof(relay2_addr));
-		print_packet(pkt, "SENT to relay 2");
+		print_packet(pkt, "CLIENT", (retransmit) ? "RE" : "S", "CLIENT", "RELAY2");
 	}
 }
 
@@ -87,9 +87,9 @@ int main () {
 			int nread = fread(msg, 1, PACKET_SIZE, fp);
 			/*msg[nread] = 0;*/
 
-			PACKET pkt = create_new_packet(strlen(msg)*sizeof(char), curr_seqno, nread != PACKET_SIZE, false, 0, msg); // if nread != PACKET_SIZE, then packet is last
+			PACKET pkt = create_new_packet(strlen(msg)*sizeof(char), curr_seqno, nread != PACKET_SIZE, false, msg); // if nread != PACKET_SIZE, then packet is last
 
-			send_packet_to_relay(pkt, relay1_fd, relay2_fd, relay1_addr, relay2_addr);
+			send_packet_to_relay(pkt, relay1_fd, relay2_fd, relay1_addr, relay2_addr, false);
 
 			pkt_buf[curr_seqno % WINDOW_SIZE] = pkt;
 			pkt_status[curr_seqno % WINDOW_SIZE] = unack;
@@ -112,18 +112,14 @@ int main () {
 				if (diff > PKT_TIMEOUT) {
 					// retransmission
 					
-					send_packet_to_relay(pkt_buf[i], relay1_fd, relay2_fd, relay1_addr, relay2_addr);
+					print_packet(pkt_buf[i], "CLIENT", "TO", 
+							(pkt_buf[i].seqno % 2 == 0) ? "RELAY1" : "RELAY2", "CLIENT");
+
+					send_packet_to_relay(pkt_buf[i], relay1_fd, relay2_fd, relay1_addr, relay2_addr, true);
 
 					// reset timer
 					timers[i] = clock();
-
-					// recalculate diff
-					/*diff = (double)(curr_time - timers[i])/CLOCKS_PER_SEC;*/
 				}
-				/*
-				 *double rem_time = PKT_TIMEOUT - diff;
-				 *if (min_time == -1 || rem_time < min_time) min_time = rem_time;
-				 */
 			}
 		}
 
@@ -138,7 +134,7 @@ int main () {
 			nread = recvfrom(relay1_fd, &rcv, MAX_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr *) &relay1_addr, &slen);
 			if (nread == 0) r1_stop = true;
 			else if (nread != -1) {
-				print_packet(rcv, "RCVD from relay 1");
+				print_packet(rcv, "CLIENT", "R", "RELAY1", "CLIENT");
 
 				if (rcv.seqno >= window_start) {
 					pkt_status[rcv.seqno % WINDOW_SIZE] = ack;
@@ -169,7 +165,7 @@ int main () {
 			nread = recvfrom(relay2_fd, &rcv, MAX_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr *) &relay2_addr, &slen);
 			if (nread == 0) r2_stop = true;
 			else if (nread != -1) {
-				print_packet(rcv, "RCVD from relay 2");
+				print_packet(rcv, "CLIENT", "R", "RELAY2", "CLIENT");
 
 				if (rcv.seqno >= window_start) {
 					pkt_status[rcv.seqno % WINDOW_SIZE] = ack;

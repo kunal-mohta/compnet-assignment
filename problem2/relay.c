@@ -16,6 +16,12 @@ int main (int argc, char *argv[]) {
 		return 1;
 	}
 
+	char relay_name[10];
+	if (strcmp(argv[1], "even") == 0)
+		strcpy(relay_name, "RELAY1");
+	else
+		strcpy(relay_name, "RELAY2");
+
 	srand(time(0)); // initialize random num generation
 
 
@@ -92,22 +98,21 @@ int main (int argc, char *argv[]) {
 			if (ret != 0) { 
 				// socket not closed
 
-				/*if (!should_drop()) {*/
+				if (!should_drop()) {
 					// packet not dropped
+					print_packet(rcv, relay_name, "R", "CLIENT", relay_name);
 
-					print_packet(rcv, "RCVD from client");
+					// add delay
+					// uniformly distributed in a range
+					mdelay(rand_range(DELAY_MIN, DELAY_MAX));
 
-					/*mdelay(rand_range(DELAY_MIN, DELAY_MAX));*/
-
-					PACKET pkt = create_new_packet(rcv.size, rcv.seqno, rcv.is_last, rcv.is_ack, rcv.channel_id, rcv.payload);
+					PACKET pkt = create_new_packet(rcv.size, rcv.seqno, rcv.is_last, rcv.is_ack, rcv.payload);
 					sendto(server_fd, &pkt, MAX_PACKET_SIZE, 0, (struct sockaddr *) &serv_addr, saddr_size);
-					print_packet(pkt, "SENT to server");
-				/*
-				 *}
-				 *else {
-				 *    printf("client packet dropped\n");
-				 *}
-				 */
+					print_packet(pkt, relay_name, "S", relay_name, "SERVER");
+				}
+				else {
+					print_packet(rcv, relay_name, "D", "CLIENT", relay_name);
+				}
 			}
 			else {
 				client_closed = true;
@@ -123,14 +128,13 @@ int main (int argc, char *argv[]) {
 			if (ret != 0) {
 				// socket not closed 
 
-				// packets from server are not dropped
-				print_packet(rcv, "RCVD from server");
+				// packets from server are not delayed or dropped
 
-				mdelay(rand_range(DELAY_MIN, DELAY_MAX));
+				print_packet(rcv, relay_name, "R", "SERVER", relay_name);
 
-				PACKET pkt = create_new_packet(rcv.size, rcv.seqno, rcv.is_last, rcv.is_ack, rcv.channel_id, rcv.payload);
+				PACKET pkt = create_new_packet(rcv.size, rcv.seqno, rcv.is_last, rcv.is_ack, rcv.payload);
 				sendto(client_fd, &pkt, MAX_PACKET_SIZE, 0, (struct sockaddr *) &client_addr, caddr_size);
-				print_packet(pkt, "SENT to client");
+				print_packet(pkt, relay_name, "S", relay_name, "CLIENT");
 			} 
 			else {
 				server_closed = true;

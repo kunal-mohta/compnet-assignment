@@ -11,10 +11,11 @@
 
 int main () {
 	// Packet window buffer related initialization
-	PACKET pkt_buf[WINDOW_SIZE];
+	char *pkt_buf[WINDOW_SIZE];
 	enum State pkt_status[WINDOW_SIZE];
 	for (int i = 0; i < WINDOW_SIZE; i++) {
 		pkt_status[i] = unack;
+		pkt_buf[i] = NULL;
 	}
 	int window_start = 0, window_end = WINDOW_SIZE-1;
 
@@ -82,24 +83,30 @@ int main () {
 			if (ret != 0) { 
 				// socket not closed
 
-				print_packet(rcv, "RCVD from relay 1");
+				print_packet(rcv, "SERVER", "R", "RELAY1", "SERVER");
 
 				// according to SR protocol
 				// as given in Kurose-Ross textbook
 				if (rcv.seqno >= window_start - WINDOW_SIZE && rcv.seqno <= window_end) {
 					// send ACK
-					PACKET pkt = create_new_packet(4, rcv.seqno, rcv.is_last, true, rcv.channel_id, "ACK");
+					PACKET pkt = create_new_packet(4, rcv.seqno, rcv.is_last, true, "ACK");
 					sendto(serv_fd, &pkt, MAX_PACKET_SIZE, 0, (struct sockaddr *) &relay1_addr, r1addr_size);
-					print_packet(pkt, "SENT to relay 1");
+					print_packet(pkt, "SERVER", "S", "SERVER", "RELAY1");
 
 					pkt_status[rcv.seqno % WINDOW_SIZE] = ack;
-					pkt_buf[rcv.seqno % WINDOW_SIZE] = rcv;
+
+					char *rcv_payload = (char *) malloc((rcv.size)*sizeof(char));
+					strcpy(rcv_payload, rcv.payload);
+					pkt_buf[rcv.seqno % WINDOW_SIZE] = rcv_payload;
 
 					if (rcv.seqno == window_start) {
 						int ind = window_start % WINDOW_SIZE;
 						while (pkt_status[ind] == ack) {
-							fwrite(pkt_buf[ind].payload, 1, pkt_buf[ind].size, fp);
+							printf("1here %d\n", window_start);
+							fwrite(pkt_buf[ind], 1, strlen(pkt_buf[ind]), fp);
 							pkt_status[ind] = unack;
+							free(pkt_buf[ind]);
+							pkt_buf[ind] = NULL;
 							window_start++;
 							window_end++;
 							ind = window_start % WINDOW_SIZE;
@@ -121,24 +128,30 @@ int main () {
 			if (ret != 0) {
 				// socket not closed unexpectedly
 
-				print_packet(rcv, "RCVD from relay 2");
+				print_packet(rcv, "SERVER", "R", "RELAY2", "SERVER");
 
 				// according to SR protocol
 				// as given in Kurose-Ross textbook
 				if (rcv.seqno >= window_start - WINDOW_SIZE && rcv.seqno <= window_end) {
 					// send ACK
-					PACKET pkt = create_new_packet(4, rcv.seqno, rcv.is_last, true, rcv.channel_id, "ACK");
+					PACKET pkt = create_new_packet(4, rcv.seqno, rcv.is_last, true, "ACK");
 					sendto(serv_fd, &pkt, MAX_PACKET_SIZE, 0, (struct sockaddr *) &relay2_addr, r2addr_size);
-					print_packet(pkt, "SENT to relay 2");
+					print_packet(pkt, "SERVER", "S", "SERVER", "RELAY2");
 
 					pkt_status[rcv.seqno % WINDOW_SIZE] = ack;
-					pkt_buf[rcv.seqno % WINDOW_SIZE] = rcv;
+
+					char *rcv_payload = (char *) malloc((rcv.size)*sizeof(char));
+					strcpy(rcv_payload, rcv.payload);
+					pkt_buf[rcv.seqno % WINDOW_SIZE] = rcv_payload;
 
 					if (rcv.seqno == window_start) {
 						int ind = window_start % WINDOW_SIZE;
 						while (pkt_status[ind] == ack) {
-							fwrite(pkt_buf[ind].payload, 1, pkt_buf[ind].size, fp);
+							printf("2here %d\n", window_start);
+							fwrite(pkt_buf[ind], 1, strlen(pkt_buf[ind]), fp);
 							pkt_status[ind] = unack;
+							free(pkt_buf[ind]);
+							pkt_buf[ind] = NULL;
 							window_start++;
 							window_end++;
 							ind = window_start % WINDOW_SIZE;
