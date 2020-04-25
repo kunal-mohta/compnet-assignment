@@ -99,6 +99,8 @@ int main () {
 		.events = POLLIN
 	};
 
+	printf("\n****** SERVER TRACE START ******\n");
+
 	bool c0_closed = false, c1_closed = false;
 	while (!c0_closed || !c1_closed) {
 		struct pollfd c_pollfds[2] = {c0_pollfd, c1_pollfd};
@@ -114,10 +116,10 @@ int main () {
 			if (n != 0) { 
 				// socket not closed unexpectedly
 
+				print_packet(rcv, "RCVD");
+
 				if (!should_drop()) {
 					// packet not dropped
-
-					print_packet(rcv, "RCVD");
 
 					bool send_ack = true;
 					if (rcv.seqno == expected_seqno) {
@@ -136,7 +138,7 @@ int main () {
 					}
 					else if (!insert_in_buf(pkt_buf, pkt_status, rcv)) {
 						// buffer full
-						printf("Buffer is full... packet at seqno %d dropped\n", rcv.seqno);
+						/*printf("Buffer is full... packet at seqno %d dropped\n", rcv.seqno);*/
 						send_ack = false;
 					}
 
@@ -161,10 +163,10 @@ int main () {
 			if (n != 0) {
 				// socket not closed unexpectedly
 
+				print_packet(rcv, "RCVD");
+
 				if (!should_drop()) {
 					// packet not dropped
-
-					print_packet(rcv, "RCVD");
 
 					bool send_ack = true;
 					if (rcv.seqno == expected_seqno) {
@@ -183,7 +185,7 @@ int main () {
 					}
 					else if (!insert_in_buf(pkt_buf, pkt_status, rcv)) {
 						// buffer full
-						printf("Buffer is full... packet at seqno %d dropped\n", rcv.seqno);
+						/*printf("Buffer is full... packet at seqno %d dropped\n", rcv.seqno);*/
 						send_ack = false;
 					}
 
@@ -201,6 +203,7 @@ int main () {
 		}
 	}
 
+	printf("\n****** SERVER TRACE END ******\n");
 	fclose(fp);
 	close(c0_connfd);
 	close(c1_connfd);

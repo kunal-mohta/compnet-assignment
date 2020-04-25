@@ -48,6 +48,8 @@ int main () {
 
 	FILE *fp = fopen(INPUT_FILE, "r");
 
+	printf("\n****** CLIENT TRACE START ******\n");
+
 	bool c0_stop = false, c1_stop = false;
 
 	// First packet send, on channel 0
@@ -208,6 +210,7 @@ int main () {
 		
 	}
 
+	printf("\n****** CLIENT TRACE END ******\n");
 	fclose(fp);
 	close(c0_sockfd);
 	close(c1_sockfd);
