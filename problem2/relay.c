@@ -16,11 +16,18 @@ int main (int argc, char *argv[]) {
 		return 1;
 	}
 
+	int relay_cli_port, relay_serv_port; 
 	char relay_name[10];
-	if (strcmp(argv[1], "even") == 0)
+	if (strcmp(argv[1], "even") == 0) {
 		strcpy(relay_name, "RELAY1");
-	else
+		relay_cli_port = RELAY1_CLI_PORT;
+		relay_serv_port = RELAY1_SERV_PORT;
+	}
+	else {
 		strcpy(relay_name, "RELAY2");
+		relay_cli_port = RELAY2_CLI_PORT;
+		relay_serv_port = RELAY2_SERV_PORT;
+	}
 
 	srand(time(0)); // initialize random num generation
 
@@ -38,11 +45,24 @@ int main (int argc, char *argv[]) {
 		return 1;
 	}
 
+	// Setting & binding relay client addr, to avoid confusion
+	struct sockaddr_in relay_cli_addr;
+	memset(&relay_cli_addr, '0', sizeof(relay_cli_addr));
+	relay_cli_addr.sin_family = AF_INET;
+	relay_cli_addr.sin_port = htons(relay_cli_port);
+	relay_cli_addr.sin_addr.s_addr = inet_addr((strcmp(argv[1], "even") == 0) ? RELAY1_ADDR : RELAY2_ADDR);
+
+	// bindi listening socket and server addr
+	if (bind(server_fd, (struct sockaddr *) &relay_cli_addr, sizeof(relay_cli_addr)) < 0) {
+		perror("Error in binding relay client side address");
+		return 1;
+	}
+
 	// Setting server address
 	memset(&serv_addr, '0', sizeof(serv_addr));
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_port = htons(SERVER_PORT);
-	serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	serv_addr.sin_addr.s_addr = inet_addr(SERV_ADDR);
 
 	// Inform server about relay addr
 	sendto(server_fd, SYNC_MSG, SYNC_LEN*sizeof(char), 0, (struct sockaddr *) &serv_addr, saddr_size);
@@ -62,8 +82,8 @@ int main (int argc, char *argv[]) {
 	// Setting relay server addr
 	memset(&relay_serv_addr, '0', sizeof(relay_serv_addr));
 	relay_serv_addr.sin_family = AF_INET;
-	relay_serv_addr.sin_port = htons((strcmp(argv[1], "even") == 0) ? EVEN_RELAY_PORT : ODD_RELAY_PORT );
-	relay_serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	relay_serv_addr.sin_port = htons(relay_serv_port);
+	relay_serv_addr.sin_addr.s_addr = inet_addr((strcmp(argv[1], "even") == 0) ? RELAY1_ADDR : RELAY2_ADDR);
 
 	// bindi listening socket and server addr
 	if (bind(client_fd, (struct sockaddr *) &relay_serv_addr, sizeof(relay_serv_addr)) < 0) {
@@ -81,6 +101,7 @@ int main (int argc, char *argv[]) {
 	}
 
 	/** NEED TO LISTEN FOR MSGS FROM BOTH SERVER & CLIENT **/
+	printf("\n%-10s %-10s %-20s %-13s %-10s %-10s %-10s\n", "Node name", "Event", "Timestamp", "Packet type", "Seq. no.", "Source", "Dest");
 
 	bool client_closed = false, server_closed = false;
 	// exit when either one of client or server socket is closed

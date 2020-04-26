@@ -28,6 +28,7 @@ void print_packet (PACKET pkt, char *append) {
 	/*printf("msg: %s\n", pkt.payload);*/
 }
 
+// decides whether to drop packet
 bool should_drop () {
 	double threshold = ((double)PDR)/100;
 	double norm_rand = ((double)rand())/RAND_MAX;

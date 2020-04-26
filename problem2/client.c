@@ -55,20 +55,21 @@ int main () {
 	// Setting relay 1 address
 	memset(&relay1_addr, '0', sizeof(relay1_addr));
 	relay1_addr.sin_family = AF_INET;
-	relay1_addr.sin_port = htons(EVEN_RELAY_PORT);
-	relay1_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	relay1_addr.sin_port = htons(RELAY1_SERV_PORT);
+	relay1_addr.sin_addr.s_addr = inet_addr(RELAY1_ADDR);
 
 	// Setting relay 2 address
 	memset(&relay2_addr, '0', sizeof(relay2_addr));
 	relay2_addr.sin_family = AF_INET;
-	relay2_addr.sin_port = htons(ODD_RELAY_PORT);
-	relay2_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	relay2_addr.sin_port = htons(RELAY2_SERV_PORT);
+	relay2_addr.sin_addr.s_addr = inet_addr(RELAY2_ADDR);
 
 	// Inform relays about client addr
 	sendto(relay1_fd, SYNC_MSG, SYNC_LEN*sizeof(char), 0, (struct sockaddr *) &relay1_addr, sizeof(relay1_addr));
 	sendto(relay2_fd, SYNC_MSG, SYNC_LEN*sizeof(char), 0, (struct sockaddr *) &relay2_addr, sizeof(relay2_addr));
 
 
+	printf("\n%-10s %-10s %-20s %-13s %-10s %-10s %-10s\n", "Node name", "Event", "Timestamp", "Packet type", "Seq. no.", "Source", "Dest");
 	FILE *fp = fopen(INPUT_FILE, "r");
 
 	bool r1_stop = false, r2_stop = false, file_end = false;
@@ -148,9 +149,11 @@ int main () {
 						}
 					}
 				}
-				else {
-					printf("Duplicate ACK\n");
-				}
+				/*
+				 *else {
+				 *    printf("Duplicate ACK\n");
+				 *}
+				 */
 				
 			}
 		/*}*/
@@ -179,9 +182,11 @@ int main () {
 						}
 					}
 				}
-				else {
-					printf("Duplicate ACK\n");
-				}
+				/*
+				 *else {
+				 *    printf("Duplicate ACK\n");
+				 *}
+				 */
 			}
 		/*}*/
 		

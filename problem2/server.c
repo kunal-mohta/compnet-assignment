@@ -21,7 +21,6 @@ int main () {
 
 
 	int serv_fd;
-	int r1_fd, r2_fd; // relay 1,2 connection sockets
 	struct sockaddr_in serv_addr;
 
 	// listening socket
@@ -67,6 +66,7 @@ int main () {
 
 	// output file
 	FILE *fp = fopen(OUTPUT_FILE, "w");
+	printf("\n%-10s %-10s %-20s %-13s %-10s %-10s %-10s\n", "Node name", "Event", "Timestamp", "Packet type", "Seq. no.", "Source", "Dest");
 
 	bool r1_closed = false, r2_closed = true;
 	while (!r1_closed || !r2_closed) {
@@ -75,23 +75,39 @@ int main () {
 		int ret;
 
 		memset(&rcv, 0, sizeof(rcv));
-		r1addr_size = sizeof(relay1_addr);
-		ret = recvfrom(serv_fd, &rcv, MAX_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr *) &relay1_addr, &r1addr_size);
+
+		struct sockaddr_in relay_addr;
+		int raddr_size = sizeof(relay_addr);
+		raddr_size = sizeof(relay_addr);
+		ret = recvfrom(serv_fd, &rcv, MAX_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr *) &relay_addr, &raddr_size);
+		int relay_num = 0;
+		char relay_name[10];
+		if (relay_addr.sin_addr.s_addr == relay1_addr.sin_addr.s_addr
+				&& relay_addr.sin_port == relay1_addr.sin_port) {
+			relay_num = 1;
+			strcpy(relay_name, "RELAY1");
+		}
+		else if (relay_addr.sin_addr.s_addr == relay2_addr.sin_addr.s_addr
+				&& relay_addr.sin_port == relay2_addr.sin_port) {
+			relay_num = 2;
+			strcpy(relay_name, "RELAY2");
+		}
+
 		if (ret != -1) {
 			// msg received from relay 1 
 
 			if (ret != 0) { 
 				// socket not closed
 
-				print_packet(rcv, "SERVER", "R", "RELAY1", "SERVER");
+				print_packet(rcv, "SERVER", "R", relay_name, "SERVER");
 
 				// according to SR protocol
 				// as given in Kurose-Ross textbook
 				if (rcv.seqno >= window_start - WINDOW_SIZE && rcv.seqno <= window_end) {
 					// send ACK
 					PACKET pkt = create_new_packet(4, rcv.seqno, rcv.is_last, true, "ACK");
-					sendto(serv_fd, &pkt, MAX_PACKET_SIZE, 0, (struct sockaddr *) &relay1_addr, r1addr_size);
-					print_packet(pkt, "SERVER", "S", "SERVER", "RELAY1");
+					sendto(serv_fd, &pkt, MAX_PACKET_SIZE, 0, (struct sockaddr *) &relay_addr, raddr_size);
+					print_packet(pkt, "SERVER", "S", "SERVER", relay_name);
 
 					pkt_status[rcv.seqno % WINDOW_SIZE] = ack;
 
@@ -102,7 +118,7 @@ int main () {
 					if (rcv.seqno == window_start) {
 						int ind = window_start % WINDOW_SIZE;
 						while (pkt_status[ind] == ack) {
-							printf("1here %d\n", window_start);
+							/*printf("1here %d\n", window_start);*/
 							fwrite(pkt_buf[ind], 1, strlen(pkt_buf[ind]), fp);
 							pkt_status[ind] = unack;
 							free(pkt_buf[ind]);
@@ -119,54 +135,54 @@ int main () {
 			}
 		}
 
-		memset(&rcv, 0, sizeof(rcv));
-		r2addr_size = sizeof(relay2_addr);
-		ret = recvfrom(serv_fd, &rcv, MAX_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr *) &relay2_addr, &r2addr_size);
-		if (ret != -1) {
-			// msg received from relay 2 
-
-			if (ret != 0) {
-				// socket not closed unexpectedly
-
-				print_packet(rcv, "SERVER", "R", "RELAY2", "SERVER");
-
-				// according to SR protocol
-				// as given in Kurose-Ross textbook
-				if (rcv.seqno >= window_start - WINDOW_SIZE && rcv.seqno <= window_end) {
-					// send ACK
-					PACKET pkt = create_new_packet(4, rcv.seqno, rcv.is_last, true, "ACK");
-					sendto(serv_fd, &pkt, MAX_PACKET_SIZE, 0, (struct sockaddr *) &relay2_addr, r2addr_size);
-					print_packet(pkt, "SERVER", "S", "SERVER", "RELAY2");
-
-					pkt_status[rcv.seqno % WINDOW_SIZE] = ack;
-
-					char *rcv_payload = (char *) malloc((rcv.size)*sizeof(char));
-					strcpy(rcv_payload, rcv.payload);
-					pkt_buf[rcv.seqno % WINDOW_SIZE] = rcv_payload;
-
-					if (rcv.seqno == window_start) {
-						int ind = window_start % WINDOW_SIZE;
-						while (pkt_status[ind] == ack) {
-							printf("2here %d\n", window_start);
-							fwrite(pkt_buf[ind], 1, strlen(pkt_buf[ind]), fp);
-							pkt_status[ind] = unack;
-							free(pkt_buf[ind]);
-							pkt_buf[ind] = NULL;
-							window_start++;
-							window_end++;
-							ind = window_start % WINDOW_SIZE;
-						}
-					}
-				}
-			} 
-			else {
-				r2_closed = true;
-			}
-		}
+/*
+ *        memset(&rcv, 0, sizeof(rcv));
+ *        r2addr_size = sizeof(relay2_addr);
+ *        ret = recvfrom(serv_fd, &rcv, MAX_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr *) &relay2_addr, &r2addr_size);
+ *        if (ret != -1) {
+ *            // msg received from relay 2 
+ *
+ *            if (ret != 0) {
+ *                // socket not closed unexpectedly
+ *
+ *                print_packet(rcv, "SERVER", "R", "RELAY2", "SERVER");
+ *
+ *                // according to SR protocol
+ *                // as given in Kurose-Ross textbook
+ *                if (rcv.seqno >= window_start - WINDOW_SIZE && rcv.seqno <= window_end) {
+ *                    // send ACK
+ *                    PACKET pkt = create_new_packet(4, rcv.seqno, rcv.is_last, true, "ACK");
+ *                    sendto(serv_fd, &pkt, MAX_PACKET_SIZE, 0, (struct sockaddr *) &relay2_addr, r2addr_size);
+ *                    print_packet(pkt, "SERVER", "S", "SERVER", "RELAY2");
+ *
+ *                    pkt_status[rcv.seqno % WINDOW_SIZE] = ack;
+ *
+ *                    char *rcv_payload = (char *) malloc((rcv.size)*sizeof(char));
+ *                    strcpy(rcv_payload, rcv.payload);
+ *                    pkt_buf[rcv.seqno % WINDOW_SIZE] = rcv_payload;
+ *
+ *                    if (rcv.seqno == window_start) {
+ *                        int ind = window_start % WINDOW_SIZE;
+ *                        while (pkt_status[ind] == ack) {
+ *                            [>printf("2here %d\n", window_start);<]
+ *                            fwrite(pkt_buf[ind], 1, strlen(pkt_buf[ind]), fp);
+ *                            pkt_status[ind] = unack;
+ *                            free(pkt_buf[ind]);
+ *                            pkt_buf[ind] = NULL;
+ *                            window_start++;
+ *                            window_end++;
+ *                            ind = window_start % WINDOW_SIZE;
+ *                        }
+ *                    }
+ *                }
+ *            } 
+ *            else {
+ *                r2_closed = true;
+ *            }
+ *        }
+ */
 	}
 
 	fclose(fp);
-	close(r1_fd);
-	close(r2_fd);
 	close(serv_fd);
 }

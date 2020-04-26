@@ -34,10 +34,10 @@ char *generate_timestamp () {
 void print_packet (PACKET pkt, char *node_name, char *event, char *src, char *dst) {
 	char *time_stamp = generate_timestamp();
 	if (pkt.is_ack) {
-		printf("\n%15s %10s %25s %10s %10d %15s %15s\n", node_name, event, time_stamp, "ACK", pkt.seqno, src, dst);
+		printf("\n%-10s %-10s %-20s %-13s %-10d %-10s %-10s\n", node_name, event, time_stamp, "ACK", pkt.seqno, src, dst);
 	}
 	else {
-		printf("\n%15s %10s %25s %10s %10d %15s %15s\n", node_name, event, time_stamp, "DATA", pkt.seqno, src, dst);
+		printf("\n%-10s %-10s %-20s %-13s %-10d %-10s %-10s\n", node_name, event, time_stamp, "DATA", pkt.seqno, src, dst);
 	}
 	free(time_stamp);
 }
