@@ -128,8 +128,8 @@ int main (int argc, char *argv[]) {
 					mdelay(rand_range(DELAY_MIN, DELAY_MAX));
 
 					PACKET pkt = create_new_packet(rcv.size, rcv.seqno, rcv.is_last, rcv.is_ack, rcv.payload);
-					sendto(server_fd, &pkt, MAX_PACKET_SIZE, 0, (struct sockaddr *) &serv_addr, saddr_size);
 					print_packet(pkt, relay_name, "S", relay_name, "SERVER");
+					sendto(server_fd, &pkt, MAX_PACKET_SIZE, 0, (struct sockaddr *) &serv_addr, saddr_size);
 				}
 				else {
 					print_packet(rcv, relay_name, "D", "CLIENT", relay_name);
@@ -154,8 +154,8 @@ int main (int argc, char *argv[]) {
 				print_packet(rcv, relay_name, "R", "SERVER", relay_name);
 
 				PACKET pkt = create_new_packet(rcv.size, rcv.seqno, rcv.is_last, rcv.is_ack, rcv.payload);
-				sendto(client_fd, &pkt, MAX_PACKET_SIZE, 0, (struct sockaddr *) &client_addr, caddr_size);
 				print_packet(pkt, relay_name, "S", relay_name, "CLIENT");
+				sendto(client_fd, &pkt, MAX_PACKET_SIZE, 0, (struct sockaddr *) &client_addr, caddr_size);
 			} 
 			else {
 				server_closed = true;

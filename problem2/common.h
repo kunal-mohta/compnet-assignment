@@ -6,11 +6,11 @@
 #define DELAY_MIN					0 // lower bound of delay added by relay (in milliseconds)
 #define DELAY_MAX					2 // upper bound of delay added by relay (in milliseconds)
 #define PACKET_SIZE					100
-#define PDR							50 // packet drop rate (in percentage)
+#define PDR							10 // packet drop rate (in percentage)
 #define PKT_TIMEOUT					2 // retransmission time (in seconds - use decimal for ms)
-#define INPUT_FILE					"input.txt"
+#define INPUT_FILE					"md_input.txt"
 #define OUTPUT_FILE					"output.txt"
-#define WINDOW_SIZE					5 // also becomes the size of buffer for server
+#define WINDOW_SIZE					1 // also becomes the size of buffer for server
 
 #define SERVER_PORT					5001
 #define RELAY1_CLI_PORT				6001 // for relay as client socket

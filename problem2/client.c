@@ -11,12 +11,12 @@
 
 void send_packet_to_relay (PACKET pkt, int relay1_fd, int relay2_fd, struct sockaddr_in relay1_addr, struct sockaddr_in relay2_addr, bool retransmit) {
 	if (pkt.seqno % 2 == 0) {
-		sendto(relay1_fd, &pkt, MAX_PACKET_SIZE, 0, (struct sockaddr *) &relay1_addr, sizeof(relay1_addr));
 		print_packet(pkt, "CLIENT", (retransmit) ? "RE" : "S", "CLIENT", "RELAY1");
+		sendto(relay1_fd, &pkt, MAX_PACKET_SIZE, 0, (struct sockaddr *) &relay1_addr, sizeof(relay1_addr));
 	}
 	else {
-		sendto(relay2_fd, &pkt, MAX_PACKET_SIZE, 0, (struct sockaddr *) &relay2_addr, sizeof(relay2_addr));
 		print_packet(pkt, "CLIENT", (retransmit) ? "RE" : "S", "CLIENT", "RELAY2");
+		sendto(relay2_fd, &pkt, MAX_PACKET_SIZE, 0, (struct sockaddr *) &relay2_addr, sizeof(relay2_addr));
 	}
 }
 
@@ -113,8 +113,8 @@ int main () {
 				if (diff > PKT_TIMEOUT) {
 					// retransmission
 					
-					print_packet(pkt_buf[i], "CLIENT", "TO", 
-							(pkt_buf[i].seqno % 2 == 0) ? "RELAY1" : "RELAY2", "CLIENT");
+					print_packet(pkt_buf[i], "CLIENT", "TO", "CLIENT", 
+							(pkt_buf[i].seqno % 2 == 0) ? "RELAY1" : "RELAY2");
 
 					send_packet_to_relay(pkt_buf[i], relay1_fd, relay2_fd, relay1_addr, relay2_addr, true);
 

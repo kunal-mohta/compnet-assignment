@@ -51,7 +51,6 @@ int main () {
 		return 1;
 	}
 	r1_sync[SYNC_LEN] = 0;
-	printf("r1 sync: %s\n", r1_sync);
 
 	// Get relay 2 addr
 	struct sockaddr_in relay2_addr;
@@ -62,7 +61,6 @@ int main () {
 		return 1;
 	}
 	r2_sync[SYNC_LEN] = 0;
-	printf("r2 sync: %s\n", r2_sync);
 
 	// output file
 	FILE *fp = fopen(OUTPUT_FILE, "w");
@@ -106,8 +104,8 @@ int main () {
 				if (rcv.seqno >= window_start - WINDOW_SIZE && rcv.seqno <= window_end) {
 					// send ACK
 					PACKET pkt = create_new_packet(4, rcv.seqno, rcv.is_last, true, "ACK");
-					sendto(serv_fd, &pkt, MAX_PACKET_SIZE, 0, (struct sockaddr *) &relay_addr, raddr_size);
 					print_packet(pkt, "SERVER", "S", "SERVER", relay_name);
+					sendto(serv_fd, &pkt, MAX_PACKET_SIZE, 0, (struct sockaddr *) &relay_addr, raddr_size);
 
 					pkt_status[rcv.seqno % WINDOW_SIZE] = ack;
 
