@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include "common.h"
+#include "packet.h"
 
 PACKET create_new_packet (int size, int seqno, bool is_last, bool is_ack, int cid, char *payload) {
 	PACKET pkt;

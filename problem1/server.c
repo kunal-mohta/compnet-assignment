@@ -8,6 +8,7 @@
 #include <time.h>
 
 #include "common.h"
+#include "packet.h"
 
 bool insert_in_buf (PACKET pkt_buf[], enum State pkt_status[], PACKET pkt) {
 	for (int i = 0; i < BUF_SIZE; i++) {
@@ -136,7 +137,7 @@ int main () {
 							pkt_status[pind] = invalid; // delete from buffer
 						}
 					}
-					else if (!insert_in_buf(pkt_buf, pkt_status, rcv)) {
+					else if (rcv.seqno > expected_seqno && !insert_in_buf(pkt_buf, pkt_status, rcv)) {
 						// buffer full
 						/*printf("Buffer is full... packet at seqno %d dropped\n", rcv.seqno);*/
 						send_ack = false;

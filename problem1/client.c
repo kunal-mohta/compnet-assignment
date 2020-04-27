@@ -8,6 +8,7 @@
 #include <time.h>
 
 #include "common.h"
+#include "packet.h"
 
 int main () {
 	int c0_sockfd, c1_sockfd; // channel 0, 1 sockets
@@ -32,7 +33,7 @@ int main () {
 	memset(&serv_addr, '0', sizeof(serv_addr));
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_port = htons(SERVER_PORT);
-	serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	serv_addr.sin_addr.s_addr = inet_addr(SERV_ADDR);
 
 	// Establish connection channel 0
 	if (connect(c0_sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
@@ -47,6 +48,10 @@ int main () {
 	}
 
 	FILE *fp = fopen(INPUT_FILE, "r");
+	if (fp == NULL) {
+		printf("Error opening input file...\n");
+		return 1;
+	}
 
 	printf("\n****** CLIENT TRACE START ******\n");
 
